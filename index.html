@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>VR MFBF 교대 단안 시선 훈련 V14.0</title>
+  <title>VR MFBF 시선 조준 훈련 V14.2 (거리 자동보완)</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <style>
     body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
@@ -25,8 +25,6 @@
     #result-modal h1 { color: #38bdf8; margin-top: 0; }
     #result-modal .final-score { font-size: 42px; color: #eab308; margin: 20px 0; font-weight: bold; }
     #result-modal .reset-btn { background: #38bdf8; color: #000; padding: 10px 25px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
-    .radio-group { display: flex; gap: 10px; margin-top: 4px; }
-    .radio-label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #cbd5e1; cursor: pointer; }
   </style>
   
   <script>
@@ -50,12 +48,12 @@
 <body>
 
   <div id="control-panel">
-    <div class="panel-title">🎯 MFBF 시선 조준 훈련 V14</div>
+    <div class="panel-title">🎯 거리 자동보완 MFBF V14.2</div>
     
     <div class="panel-group">
-      <label>⚙️ 조작 방식 안내</label>
+      <label>⚙️ 자동 거리 제어 시스템</label>
       <div style="font-size: 12px; color: #38bdf8; background: rgba(56,189,248,0.1); padding: 9px; border-radius: 6px; line-height: 1.4; word-break: keep-all;">
-        <strong>컨트롤러 불필요!</strong> 고개를 움직여 화면 중앙의 <strong>흰색 동그라미 링</strong>을 풍선 위에 올리면 자동 인지되어 터집니다.
+        환자의 헤드셋 착용 위치와 초기 오차를 실시간 계산하여 **풍선과의 조준 거리를 자동으로 상쇄·보정**합니다.
       </div>
     </div>
 
@@ -69,8 +67,8 @@
     </div>
 
     <div class="panel-group">
-      <label>↔️ 무작위 발생 시야 반경 <span class="display-value" id="range-txt">1.50</span></label>
-      <input type="range" id="range-slider" min="0.50" max="2.40" value="1.50" step="0.10">
+      <label>↔️ 무작위 발생 시야 반경 <span class="display-value" id="range-txt">1.40</span></label>
+      <input type="range" id="range-slider" min="0.50" max="2.40" value="1.40" step="0.10">
     </div>
 
     <div class="panel-group">
@@ -101,29 +99,31 @@
       <canvas id="bgCheckerCanvas" width="512" height="512"></canvas>
     </a-assets>
 
+    <a-sky id="rotating-bg" src="#bgCheckerCanvas" radius="50" material="shader: flat; repeat: 16 16; side: back;" stereo-eye-lock="eye: both"></a-sky>
+
     <a-entity id="cameraRig">
       <a-entity id="mainCamera" camera look-controls position="0 1.6 0">
-        <a-entity id="centerFixationRay" raycaster="objects: .gaze-balloon-target; far: 6; interval: 20;"></a-entity>
+        <a-entity id="centerFixationRay" raycaster="objects: .gaze-secure-trigger; far: 100; interval: 15;"></a-entity>
         
         <a-ring radius-inner="0.025" radius-outer="0.038" color="#ffffff" position="0 0 -1" material="shader: flat; opacity: 0.8; depthTest: false;"></a-ring>
       </a-entity>
     </a-entity>
 
-    <a-sky id="rotating-bg" src="#bgCheckerCanvas" radius="50" material="shader: flat; repeat: 16 16; side: back;" stereo-eye-lock="eye: both"></a-sky>
-
     <a-entity id="magic-eye-board" visible="true">
       
       <a-entity id="left-eye-container" stereo-eye-lock="eye: left">
-        <a-sphere id="balloon-left" class="gaze-balloon-target" color="#ff2a2a" material="roughness: 0.15; metalness: 0.2;">
+        <a-sphere id="balloon-left" color="#ff2a2a" material="roughness: 0.15; metalness: 0.2;">
           <a-cone id="cone-left" radius-top="0.01" color="#cc1111"></a-cone>
         </a-sphere>
       </a-entity>
       
       <a-entity id="right-eye-container" stereo-eye-lock="eye: right">
-        <a-sphere id="balloon-right" class="gaze-balloon-target" color="#10b981" material="roughness: 0.15; metalness: 0.2;">
+        <a-sphere id="balloon-right" color="#10b981" material="roughness: 0.15; metalness: 0.2;">
           <a-cone id="cone-right" radius-top="0.01" color="#047857"></a-cone>
         </a-sphere>
       </a-entity>
+
+      <a-entity id="gaze-collision-trigger" class="gaze-secure-trigger" geometry="primitive: sphere; radius: 0.35" material="visible: false;" stereo-eye-lock="eye: both"></a-entity>
       
     </a-entity>
 
@@ -142,16 +142,12 @@
       }
     }
 
-    let audioCtx = null; let score = 0; let randomRange = 1.50; 
+    let audioCtx = null; let score = 0; let randomRange = 1.40; 
     let rotationSpeed = 2; let bgAngle = 0; let isTrainingActive = false; let isPopping = false; 
 
     let elapsedInterval = null; let totalSecondsElapsed = 0; let targetSeconds = 600;      
-    
-    // 순환 변수 ("left" = 빨강풍선 활성화, "right" = 초록풍선 활성화)
     let activeTurn = "left"; 
-    let currentX = 0, currentY = 1.6;
-
-    function getFixedZ() { return -3.5; } // 시각적 왜곡이 적고 도약하기 가장 좋은 깊이 임상값 설정
+    let currentX = 0, currentY = 1.6, currentZ = -3.5;
 
     document.getElementById('range-slider').addEventListener('input', (e) => {
       randomRange = parseFloat(e.target.value);
@@ -163,30 +159,41 @@
       document.getElementById('bg-speed-txt').innerText = rotationSpeed;
     });
 
-    // 훈련 대상 타겟을 랜덤 위치로 재배치하는 핵심 연산 루틴
+    // [핵심 업그레이드] 환자의 현재 브라우저 카메라 위치를 계산하여 거리를 자동 보정하는 렌더링 함수
     function renderAlternatingTargets() {
       if (!isTrainingActive) return;
 
-      let targetZ = getFixedZ(); 
-      let radiusRadius = 0.26; // 시선 터치 안정을 위해 살짝 크기 확장
+      // 1. 환자의 현재 카메라 위치(X, Y, Z) 실시간 추출 (멀리 있든 가까이 있든 기저 좌표 확인)
+      const cameraEl = document.getElementById('mainCamera');
+      let camPos = {x: 0, y: 1.6, z: 0};
+      if (cameraEl && cameraEl.object3D) {
+        camPos.x = cameraEl.object3D.position.x;
+        camPos.y = cameraEl.object3D.position.y;
+        camPos.z = cameraEl.object3D.position.z;
+      }
 
-      let randX = (Math.random() - 0.5) * (randomRange * 2.2);
-      let randY = 1.6 + (Math.random() - 0.5) * (randomRange * 1.6); 
+      let radiusRadius = 0.25; 
 
-      // 시야 범위를 벗어나지 않도록 클리핑 안전 보정
-      if (randY < 0.6) randY = 0.6;
-      if (randY > 2.6) randY = 2.6;
+      // 2. 환자의 현재 위치(camPos)를 기준으로 상대적 거리 연산 적용
+      // 브라우저를 멀리서 열었더라도 camPos.z 값을 더해주어 풍선이 항상 환자 눈앞 3.5m 거리에 오도록 보정
+      let baseZ = camPos.z - 3.5; 
+      let randX = camPos.x + (Math.random() - 0.5) * (randomRange * 2.2);
+      let randY = camPos.y + (Math.random() - 0.5) * (randomRange * 1.6); 
+
+      if (randY < camPos.y - 1.0) randY = camPos.y - 1.0;
+      if (randY > camPos.y + 1.2) randY = camPos.y + 1.2;
 
       currentX = randX;
       currentY = randY;
+      currentZ = baseZ;
 
       const cLeft = document.getElementById('left-eye-container');
       const cRight = document.getElementById('right-eye-container');
-      
       const bLeft = document.getElementById('balloon-left');
       const bRight = document.getElementById('balloon-right');
       const coneLeft = document.getElementById('cone-left');
       const coneRight = document.getElementById('cone-right');
+      const secureTrigger = document.getElementById('gaze-collision-trigger');
 
       if (activeTurn === "left") {
         document.getElementById('active-eye-txt').innerText = "왼쪽눈 (빨강)";
@@ -195,11 +202,7 @@
         cLeft.setAttribute('visible', 'true');
         cRight.setAttribute('visible', 'false');
 
-        // 레이캐스터 감지 클래스를 현재 켜진 쪽에만 명확하게 주입
-        bLeft.classList.add('gaze-balloon-target');
-        bRight.classList.remove('gaze-balloon-target');
-
-        bLeft.setAttribute('position', `${randX} ${randY} ${targetZ}`);
+        bLeft.setAttribute('position', `${randX} ${randY} ${baseZ}`);
         bLeft.setAttribute('radius', radiusRadius);
         coneLeft.setAttribute('position', `0 ${-radiusRadius * 1.1} 0`);
         coneLeft.setAttribute('radius-bottom', `${radiusRadius * 0.15}`);
@@ -212,14 +215,21 @@
         cLeft.setAttribute('visible', 'false');
         cRight.setAttribute('visible', 'true');
 
-        bLeft.classList.remove('gaze-balloon-target');
-        bRight.classList.add('gaze-balloon-target');
-
-        bRight.setAttribute('position', `${randX} ${randY} ${targetZ}`);
+        bRight.setAttribute('position', `${randX} ${randY} ${baseZ}`);
         bRight.setAttribute('radius', radiusRadius);
         coneRight.setAttribute('position', `0 ${-radiusRadius * 1.1} 0`);
         coneRight.setAttribute('radius-bottom', `${radiusRadius * 0.15}`);
         coneRight.setAttribute('height', `${radiusRadius * 0.25}`);
+      }
+
+      // 3. 투명 충돌 트리거 역시 보정된 Z축 위치에 칼같이 동기화
+      if (secureTrigger) {
+        secureTrigger.setAttribute('position', `${randX} ${randY} ${baseZ}`);
+        // 거리가 멀어졌을 경우를 대비해 트리거 반경을 안정적으로 유지
+        secureTrigger.setAttribute('geometry', 'primitive: sphere; radius: 0.38');
+        if (!isPopping && !secureTrigger.classList.contains('gaze-secure-trigger')) {
+          secureTrigger.classList.add('gaze-secure-trigger');
+        }
       }
     }
 
@@ -234,7 +244,6 @@
       });
     }
 
-    // [핵심 변경] 마우스/컨트롤러 클릭 없이 시선 동그라미 중첩만 감시하는 고속 감지 엔진
     function checkTargetGazeIntersection() {
       requestAnimationFrame(checkTargetGazeIntersection);
       if (!isTrainingActive || isPopping) return; 
@@ -245,13 +254,11 @@
       let raycasterComponent = raycasterEl.components.raycaster;
       if (raycasterComponent && raycasterComponent.intersections && raycasterComponent.intersections.length > 0) {
         
-        let intersectedEl = raycasterComponent.intersections[0].el;
+        const secureTrigger = document.getElementById('gaze-collision-trigger');
+        if (secureTrigger) { secureTrigger.classList.remove('gaze-secure-trigger'); }
         
-        // 현재 조준 중인 타겟이 활성화된 타겟 클래스를 가진 경우 즉각 터뜨림 가동
-        if (intersectedEl.classList.contains('gaze-balloon-target')) {
-          isPopping = true; 
-          popTargetSuccess();
-        }
+        isPopping = true; 
+        popTargetSuccess();
       }
     }
 
@@ -260,12 +267,9 @@
       score += 1000;
       document.getElementById('val-score').innerText = score.toString().padStart(4, '0');
 
-      triggerParticlesEmission(currentX, currentY, getFixedZ(), 20);
+      triggerParticlesEmission(currentX, currentY, currentZ, 20);
       
-      // 즉시 턴 전환
       activeTurn = (activeTurn === "left") ? "right" : "left";
-
-      // 잠시 숨겼다가 다음 타겟을 리스폰하여 과도한 연속 터짐 방지 및 도약 유도
       document.getElementById('magic-eye-board').setAttribute('visible', 'false');
 
       setTimeout(() => {
@@ -273,7 +277,7 @@
         isPopping = false;
         renderAlternatingTargets(); 
         document.getElementById('magic-eye-board').setAttribute('visible', 'true'); 
-      }, 500); // 0.5초의 은닉 시간 후 다음 위치 출현
+      }, 500); 
     }
 
     function animateBackground() {
