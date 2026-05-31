@@ -2,10 +2,10 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>VR 양안시 통합 재활 시스템 V9.31 (단독 구동 특화본)</title>
+  <title>VR 양안시 통합 재활 시스템 V9.34 (2D 배경 최적화본)</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <style>
-    body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; user-select: none; }
+    body { margin: 0; overflow: hidden; background-color: #0a1128; font-family: sans-serif; user-select: none; }
     #control-panel {
       position: absolute; top: 15px; left: 15px; z-index: 99999;
       background: rgba(11, 15, 26, 0.96); color: white; padding: 22px;
@@ -27,7 +27,6 @@
   </style>
   
   <script>
-    // 하드웨어 다이렉트 렌더링 마스크 콤포넌트
     AFRAME.registerComponent('stereo-eye-lock', {
       schema: { eye: {type: 'string', default: 'both'} },
       init: function () {
@@ -43,12 +42,22 @@
         }
       }
     });
+
+    // 하드웨어 독립형 단독 회전 렌더 루프 컴포넌트
+    AFRAME.registerComponent('forced-rotator', {
+      tick: function (time, timeDelta) {
+        if (window.rotationSpeed > 0) {
+          window.bgAngle += (window.rotationSpeed * 0.0004 * (timeDelta / 16.66));
+          this.el.object3D.rotation.y = window.bgAngle;
+        }
+      }
+    });
   </script>
 </head>
 <body>
 
   <div id="control-panel">
-    <div class="panel-title">👁️ 양안시 통합 재활 설정 V9.31</div>
+    <div class="panel-title">👁️ 양안시 통합 재활 설정 V9.34</div>
     
     <div class="panel-group">
       <label>🎯 재활 훈련 모드 선택</label>
@@ -93,11 +102,8 @@
     <button class="reset-btn" onclick="location.reload()">처음으로</button>
   </div>
 
-  <a-scene background="color: #000000" vr-mode-ui="enabled: true">
-    <a-assets>
-      <canvas id="bgCheckerCanvas" width="512" height="512"></canvas>
-    </a-assets>
-
+  <a-scene background="color: #060b19" vr-mode-ui="enabled: true">
+    
     <a-entity id="cameraRig" position="0 0 0">
       <a-entity id="mainCamera" camera look-controls="pointerLockEnabled: false" position="0 0 0">
         <a-ring radius-inner="0.015" radius-outer="0.022" color="#ffffff" position="0 0 -1" material="shader: flat; opacity: 0.6; depthTest: false;"></a-ring>
@@ -105,26 +111,25 @@
       </a-entity>
     </a-entity>
 
-    <!-- 배경 우주 구체 설정 -->
-    <a-sky id="rotating-bg" src="#bgCheckerCanvas" radius="40" material="shader: flat; repeat: 12 12; side: back;" stereo-eye-lock="eye: both"></a-sky>
+    <a-entity id="forced-universe-sphere" geometry="primitive: sphere; radius: 25;" material="shader: flat; color: #050a18; side: back;" forced-rotator stereo-eye-lock="eye: both">
+      <a-sphere radius="0.05" material="color: #38bdf8; shader: flat;" position="3 2 -10"></a-sphere>
+      <a-sphere radius="0.05" material="color: #ffffff; shader: flat;" position="-4 -2 -12"></a-sphere>
+      <a-sphere radius="0.05" material="color: #a855f7; shader: flat;" position="5 -3 -15"></a-sphere>
+    </a-entity>
 
-    <!-- 훈련 핵심 물리 객체 보드 -->
     <a-entity id="magic-eye-board" visible="true" position="0 0 0">
-      <!-- 좌안 전용 타겟 -->
       <a-entity id="left-eye-container" stereo-eye-lock="eye: left">
         <a-sphere id="balloon-left" color="#ff2a2a" material="roughness: 0.2; metalness: 0.1;">
           <a-cone id="cone-left" radius-top="0.005" color="#b30000"></a-cone>
         </a-sphere>
       </a-entity>
       
-      <!-- 우안 전용 타겟 -->
       <a-entity id="right-eye-container" stereo-eye-lock="eye: right">
         <a-sphere id="balloon-right" color="#ff2a9d" material="roughness: 0.2; metalness: 0.1;">
           <a-cone id="cone-right" radius-top="0.005" color="#b30066"></a-cone>
         </a-sphere>
       </a-entity>
       
-      <!-- 중앙 가상 융합 충돌 트리거 존 -->
       <a-entity id="fusion-collision-trigger" class="fusion-target-zone" geometry="primitive: sphere; radius: 0.18" material="visible: false;" stereo-eye-lock="eye: both"></a-entity>
     </a-entity>
 
@@ -132,20 +137,11 @@
   </a-scene>
 
   <script>
-    const bgCanvas = document.getElementById('bgCheckerCanvas');
-    const bgCtx = bgCanvas.getContext('2d');
-    const bSize = 512; const bRows = 8; const bCols = 8;
-    const bW = bSize / bCols; const bH = bSize / bRows;
-    for (let r = 0; r < bRows; r++) {
-      for (let c = 0; c < bCols; c++) {
-        bgCtx.fillStyle = ((r + c) % 2 === 0) ? '#1E1E1E' : '#050505';
-        bgCtx.fillRect(c * bW, r * bH, bW, bH);
-      }
-    }
-
+    window.rotationSpeed = 4; 
+    window.bgAngle = 0; 
+    
     let audioCtx = null; let score = 0; let separationDistance = 0.15; 
-    let rotationSpeed = 4; let bgAngle = 0; let isTrainingActive = false;
-    let isPopping = false; let currentMode = "convergence";
+    let isTrainingActive = false; let isPopping = false; let currentMode = "convergence";
 
     let failureTimer = null; const FAILURE_THRESHOLD_TIME = 8000; 
     let elapsedInterval = null; let totalSecondsElapsed = 0; let targetSeconds = 180;      
@@ -165,8 +161,8 @@
       if(isTrainingActive) { renderMagicEyeElements(); }
     });
     document.getElementById('bg-speed-slider').addEventListener('input', (e) => {
-      rotationSpeed = parseInt(e.target.value);
-      document.getElementById('bg-speed-txt').innerText = rotationSpeed;
+      window.rotationSpeed = parseInt(e.target.value);
+      document.getElementById('bg-speed-txt').innerText = window.rotationSpeed;
     });
 
     function updateUI() {
@@ -222,17 +218,8 @@
       });
     }
 
-    // [독립 구동 엔진 핵심 루프] 창 비활성화 여부와 관계없이 무조건 루프 가동
     function checkMagicEyeFixation() {
       requestAnimationFrame(checkMagicEyeFixation);
-      
-      // 외부 창 의존성 완전 차단 애니메이션 업데이트
-      if (rotationSpeed > 0 && isTrainingActive && !isPopping) {
-        bgAngle += (rotationSpeed * 0.001); 
-        const sky = document.getElementById('rotating-bg');
-        if (sky) sky.setAttribute('rotation', `0 ${bgAngle * 57.3} 0`);
-      }
-
       if (!isTrainingActive || isPopping) return; 
 
       const raycasterEl = document.getElementById('centerFixationRay');
