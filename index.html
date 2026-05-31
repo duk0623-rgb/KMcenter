@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>VR MFBF 교대 단안 홱보기 마스터 V13.0</title>
+  <title>VR MFBF 교대 단안 시선 훈련 V14.0</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <style>
     body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
@@ -50,12 +50,12 @@
 <body>
 
   <div id="control-panel">
-    <div class="panel-title">🧠 MFBF 교대 단안 훈련 V13</div>
+    <div class="panel-title">🎯 MFBF 시선 조준 훈련 V14</div>
     
     <div class="panel-group">
-      <label>⚙️ 시스템 제어 방식</label>
-      <div style="font-size: 12px; color: #38bdf8; background: rgba(56,189,248,0.1); padding: 8px; border-radius: 6px; line-height: 1.4;">
-        빨강(좌안) ↔ 초록(우안) 풍선이 시야 범위 내 무작위 위치에서 교대로 출현합니다.
+      <label>⚙️ 조작 방식 안내</label>
+      <div style="font-size: 12px; color: #38bdf8; background: rgba(56,189,248,0.1); padding: 9px; border-radius: 6px; line-height: 1.4; word-break: keep-all;">
+        <strong>컨트롤러 불필요!</strong> 고개를 움직여 화면 중앙의 <strong>흰색 동그라미 링</strong>을 풍선 위에 올리면 자동 인지되어 터집니다.
       </div>
     </div>
 
@@ -70,7 +70,7 @@
 
     <div class="panel-group">
       <label>↔️ 무작위 발생 시야 반경 <span class="display-value" id="range-txt">1.50</span></label>
-      <input type="range" id="range-slider" min="0.50" max="2.50" value="1.50" step="0.10">
+      <input type="range" id="range-slider" min="0.50" max="2.40" value="1.50" step="0.10">
     </div>
 
     <div class="panel-group">
@@ -103,8 +103,9 @@
 
     <a-entity id="cameraRig">
       <a-entity id="mainCamera" camera look-controls position="0 1.6 0">
-        <a-entity id="centerFixationRay" raycaster="objects: .clickable-balloon; far: 10; interval: 20;"></a-entity>
-        <a-ring radius-inner="0.02" radius-outer="0.03" color="#ffffff" position="0 0 -1" material="shader: flat; opacity: 0.6; depthTest: false;"></a-ring>
+        <a-entity id="centerFixationRay" raycaster="objects: .gaze-balloon-target; far: 6; interval: 20;"></a-entity>
+        
+        <a-ring radius-inner="0.025" radius-outer="0.038" color="#ffffff" position="0 0 -1" material="shader: flat; opacity: 0.8; depthTest: false;"></a-ring>
       </a-entity>
     </a-entity>
 
@@ -112,14 +113,14 @@
 
     <a-entity id="magic-eye-board" visible="true">
       
-      <a-entity id="left-eye-container" class="clickable-balloon" stereo-eye-lock="eye: left">
-        <a-sphere id="balloon-left" color="#ff2a2a" material="roughness: 0.15; metalness: 0.2;">
+      <a-entity id="left-eye-container" stereo-eye-lock="eye: left">
+        <a-sphere id="balloon-left" class="gaze-balloon-target" color="#ff2a2a" material="roughness: 0.15; metalness: 0.2;">
           <a-cone id="cone-left" radius-top="0.01" color="#cc1111"></a-cone>
         </a-sphere>
       </a-entity>
       
-      <a-entity id="right-eye-container" class="clickable-balloon" stereo-eye-lock="eye: right">
-        <a-sphere id="balloon-right" color="#10b981" material="roughness: 0.15; metalness: 0.2;">
+      <a-entity id="right-eye-container" stereo-eye-lock="eye: right">
+        <a-sphere id="balloon-right" class="gaze-balloon-target" color="#10b981" material="roughness: 0.15; metalness: 0.2;">
           <a-cone id="cone-right" radius-top="0.01" color="#047857"></a-cone>
         </a-sphere>
       </a-entity>
@@ -146,11 +147,11 @@
 
     let elapsedInterval = null; let totalSecondsElapsed = 0; let targetSeconds = 600;      
     
-    // 현재 터뜨려야 할 활성 타겟 순서 ("left" = 빨강풍선, "right" = 초록풍선)
+    // 순환 변수 ("left" = 빨강풍선 활성화, "right" = 초록풍선 활성화)
     let activeTurn = "left"; 
     let currentX = 0, currentY = 1.6;
 
-    function getFixedZ() { return -3.0; } // 무작위 도약을 위한 깊이
+    function getFixedZ() { return -3.5; } // 시각적 왜곡이 적고 도약하기 가장 좋은 깊이 임상값 설정
 
     document.getElementById('range-slider').addEventListener('input', (e) => {
       randomRange = parseFloat(e.target.value);
@@ -162,21 +163,19 @@
       document.getElementById('bg-speed-txt').innerText = rotationSpeed;
     });
 
-    // [전면 개조 핵심] 단안 무작위 위치 생성 및 교대 시각화 제어 함수
+    // 훈련 대상 타겟을 랜덤 위치로 재배치하는 핵심 연산 루틴
     function renderAlternatingTargets() {
       if (!isTrainingActive) return;
 
       let targetZ = getFixedZ(); 
-      let radiusRadius = 0.24; 
+      let radiusRadius = 0.26; // 시선 터치 안정을 위해 살짝 크기 확장
 
-      // VR 헤드셋의 적정 시야범위 내 완전 랜덤 위치 산출 (X축, Y축 중심값 기준 분산)
-      // 원장님이 설정하시는 슬라이더(randomRange)에 따라 도약 범위 확장 가능
-      let randX = (Math.random() - 0.5) * (randomRange * 2);
-      let randY = 1.6 + (Math.random() - 0.5) * (randomRange * 1.5); 
+      let randX = (Math.random() - 0.5) * (randomRange * 2.2);
+      let randY = 1.6 + (Math.random() - 0.5) * (randomRange * 1.6); 
 
-      // 안전 시야 한계선 보정 (Y축이 바닥 밑으로 가거나 너무 높이 뜨는 것 방지)
+      // 시야 범위를 벗어나지 않도록 클리핑 안전 보정
       if (randY < 0.6) randY = 0.6;
-      if (randY > 2.8) randY = 2.8;
+      if (randY > 2.6) randY = 2.6;
 
       currentX = randX;
       currentY = randY;
@@ -189,13 +188,16 @@
       const coneLeft = document.getElementById('cone-left');
       const coneRight = document.getElementById('cone-right');
 
-      // 턴에 따라 한쪽 풍선만 활성화하고 반대쪽은 보이지 않게 처리하며 좌표 이동
       if (activeTurn === "left") {
         document.getElementById('active-eye-txt').innerText = "왼쪽눈 (빨강)";
         document.getElementById('active-eye-txt').style.color = "#ff2a2a";
 
         cLeft.setAttribute('visible', 'true');
         cRight.setAttribute('visible', 'false');
+
+        // 레이캐스터 감지 클래스를 현재 켜진 쪽에만 명확하게 주입
+        bLeft.classList.add('gaze-balloon-target');
+        bRight.classList.remove('gaze-balloon-target');
 
         bLeft.setAttribute('position', `${randX} ${randY} ${targetZ}`);
         bLeft.setAttribute('radius', radiusRadius);
@@ -209,6 +211,9 @@
 
         cLeft.setAttribute('visible', 'false');
         cRight.setAttribute('visible', 'true');
+
+        bLeft.classList.remove('gaze-balloon-target');
+        bRight.classList.add('gaze-balloon-target');
 
         bRight.setAttribute('position', `${randX} ${randY} ${targetZ}`);
         bRight.setAttribute('radius', radiusRadius);
@@ -229,9 +234,9 @@
       });
     }
 
-    // 레이캐스터(컨트롤러/포인터 조준) 충돌 체크 로직
-    function checkTargetFixation() {
-      requestAnimationFrame(checkTargetFixation);
+    // [핵심 변경] 마우스/컨트롤러 클릭 없이 시선 동그라미 중첩만 감시하는 고속 감지 엔진
+    function checkTargetGazeIntersection() {
+      requestAnimationFrame(checkTargetGazeIntersection);
       if (!isTrainingActive || isPopping) return; 
 
       const raycasterEl = document.getElementById('centerFixationRay');
@@ -240,13 +245,10 @@
       let raycasterComponent = raycasterEl.components.raycaster;
       if (raycasterComponent && raycasterComponent.intersections && raycasterComponent.intersections.length > 0) {
         
-        // 현재 활성화된 눈 레이어의 풍선을 짚었는지 정밀 대조 확인
         let intersectedEl = raycasterComponent.intersections[0].el;
-        let intersectedId = intersectedEl.getAttribute('id');
         
-        if ((activeTurn === "left" && (intersectedId === "left-eye-container" || intersectedId === "balloon-left")) ||
-            (activeTurn === "right" && (intersectedId === "right-eye-container" || intersectedId === "balloon-right"))) {
-          
+        // 현재 조준 중인 타겟이 활성화된 타겟 클래스를 가진 경우 즉각 터뜨림 가동
+        if (intersectedEl.classList.contains('gaze-balloon-target')) {
           isPopping = true; 
           popTargetSuccess();
         }
@@ -258,13 +260,12 @@
       score += 1000;
       document.getElementById('val-score').innerText = score.toString().padStart(4, '0');
 
-      // 파티클 방출 효과 연동
       triggerParticlesEmission(currentX, currentY, getFixedZ(), 20);
       
-      // 양안 교대 스위칭 연산
+      // 즉시 턴 전환
       activeTurn = (activeTurn === "left") ? "right" : "left";
 
-      // 숨겼다가 다음 랜덤 위치에 재배치하는 0.4초 인터벌 딜레이 적용
+      // 잠시 숨겼다가 다음 타겟을 리스폰하여 과도한 연속 터짐 방지 및 도약 유도
       document.getElementById('magic-eye-board').setAttribute('visible', 'false');
 
       setTimeout(() => {
@@ -272,7 +273,7 @@
         isPopping = false;
         renderAlternatingTargets(); 
         document.getElementById('magic-eye-board').setAttribute('visible', 'true'); 
-      }, 400); 
+      }, 500); // 0.5초의 은닉 시간 후 다음 위치 출현
     }
 
     function animateBackground() {
@@ -390,7 +391,7 @@
 
     setupVRHardwareLayers();
     animateBackground();
-    requestAnimationFrame(checkTargetFixation);
+    requestAnimationFrame(checkTargetGazeIntersection);
   </script>
 </body>
 </html>
