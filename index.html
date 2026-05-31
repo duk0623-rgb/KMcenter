@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>VR MFBF 도약 안구운동 마스터 V12.0</title>
+  <title>VR MFBF 교대 단안 홱보기 마스터 V13.0</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <style>
     body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
@@ -50,47 +50,27 @@
 <body>
 
   <div id="control-panel">
-    <div class="panel-title">🧠 MFBF 홱보기 안구운동 V12</div>
+    <div class="panel-title">🧠 MFBF 교대 단안 훈련 V13</div>
     
-    <!-- [신규 기능] 시야 교차/동측성 전환 인터페이스 -->
-    <div class="panel-group" style="background: rgba(59, 130, 246, 0.15); padding: 8px; border-radius: 6px; border: 1px dashed #3b82f6;">
-      <label>👁️ 양안 자극 모드 설정</label>
-      <div class="radio-group">
-        <label class="radio-label"><input type="radio" name="eye-relation-mode" value="crossed" checked onchange="toggleEyeRelationMode(this.value)"> 🔀 교차성 모드</label>
-        <label class="radio-label"><input type="radio" name="eye-relation-mode" value="uncrossed" onchange="toggleEyeRelationMode(this.value)"> ⬅️➡️ 동측성 모드</label>
-      </div>
-    </div>
-
     <div class="panel-group">
-      <label>⚙️ 제어 모드 선택</label>
-      <div class="radio-group">
-        <label class="radio-label"><input type="radio" name="control-mode" value="auto" checked onchange="toggleControlMode(this.value)"> 🔄 2분 자동 전환</label>
-        <label class="radio-label"><input type="radio" name="control-mode" value="manual" onchange="toggleControlMode(this.value)"> 🕹️ 수동 방향 지정</label>
+      <label>⚙️ 시스템 제어 방식</label>
+      <div style="font-size: 12px; color: #38bdf8; background: rgba(56,189,248,0.1); padding: 8px; border-radius: 6px; line-height: 1.4;">
+        빨강(좌안) ↔ 초록(우안) 풍선이 시야 범위 내 무작위 위치에서 교대로 출현합니다.
       </div>
-    </div>
-
-    <div class="panel-group" id="manual-direction-group" style="display: none;">
-      <label>🎯 수동 운동 방향 설정</label>
-      <select id="manual-dir-select" onchange="changeDirectionManually(this.value)">
-        <option value="horizontal">좌우 끝 운동</option>
-        <option value="vertical">상하 끝 운동</option>
-        <option value="diagonal-1">사선 끝 (좌상 ↔ 우하)</option>
-        <option value="diagonal-2">사선 끝 (좌하 ↔ 우상)</option>
-      </select>
     </div>
 
     <div class="panel-group">
       <label>⏰ 총 훈련 시간 설정</label>
       <select id="training-time-select">
-        <option value="120">2분 (테스트용)</option>
-        <option value="480">8분 (전방향 풀코스)</option>
+        <option value="60">1분 (테스트용)</option>
+        <option value="300">5분 (기본 안구운동)</option>
         <option value="600" selected>10분 (정밀 집중)</option>
       </select>
     </div>
 
     <div class="panel-group">
-      <label>↕️ 홱보기 시야 범위(Gap) <span class="display-value" id="separation-txt">1.20</span></label>
-      <input type="range" id="separation-slider" min="0.40" max="2.20" value="1.20" step="0.10">
+      <label>↔️ 무작위 발생 시야 반경 <span class="display-value" id="range-txt">1.50</span></label>
+      <input type="range" id="range-slider" min="0.50" max="2.50" value="1.50" step="0.10">
     </div>
 
     <div class="panel-group">
@@ -103,10 +83,9 @@
 
   <div id="score-board">
     <div style="color: #ef4444; font-size: 18px; margin-bottom: 5px;">TIME: <span id="val-time">00:00</span></div>
-    <div style="color: #38bdf8; font-size: 13px; font-weight: bold; margin-bottom: 4px;">지정 방향: <span id="current-dir-txt" style="color:#fff;">좌우 끝</span></div>
-    <div style="color: #a855f7; font-size: 12px; font-weight: bold; margin-bottom: 4px;">자극 형태: <span id="current-relation-txt" style="color:#fff;">교차성 (L-우 / R-좌)</span></div>
+    <div style="color: #eab308; font-size: 13px; font-weight: bold; margin-bottom: 4px;">활성 타겟: <span id="active-eye-txt" style="color:#ff2a2a;">왼쪽눈 (빨강)</span></div>
     <div>SCORE: <span id="val-score">0000</span></div>
-    <div style="color: #eab308; font-size: 11px; margin-top: 4px;" id="status-txt">준비 버튼을 누르세요.</div>
+    <div style="color: #cbd5e1; font-size: 11px; margin-top: 4px;" id="status-txt">준비 버튼을 누르세요.</div>
     <button id="exit-vr-control" class="exit-vr-btn" onclick="exitVRModeManually()">🔴 훈련 중단 및 복귀</button>
   </div>
 
@@ -124,8 +103,8 @@
 
     <a-entity id="cameraRig">
       <a-entity id="mainCamera" camera look-controls position="0 1.6 0">
-        <a-entity id="centerFixationRay" raycaster="objects: .fusion-target-zone; far: 10; interval: 20;"></a-entity>
-        <a-ring radius-inner="0.02" radius-outer="0.03" color="#ffffff" position="0 0 -1" material="shader: flat; opacity: 0.5; depthTest: false;"></a-ring>
+        <a-entity id="centerFixationRay" raycaster="objects: .clickable-balloon; far: 10; interval: 20;"></a-entity>
+        <a-ring radius-inner="0.02" radius-outer="0.03" color="#ffffff" position="0 0 -1" material="shader: flat; opacity: 0.6; depthTest: false;"></a-ring>
       </a-entity>
     </a-entity>
 
@@ -133,21 +112,18 @@
 
     <a-entity id="magic-eye-board" visible="true">
       
-      <!-- 왼쪽 눈 전용 (빨강풍선) -->
-      <a-entity id="left-eye-container" stereo-eye-lock="eye: left">
+      <a-entity id="left-eye-container" class="clickable-balloon" stereo-eye-lock="eye: left">
         <a-sphere id="balloon-left" color="#ff2a2a" material="roughness: 0.15; metalness: 0.2;">
           <a-cone id="cone-left" radius-top="0.01" color="#cc1111"></a-cone>
         </a-sphere>
       </a-entity>
       
-      <!-- 오른쪽 눈 전용 (녹색풍선) -->
-      <a-entity id="right-eye-container" stereo-eye-lock="eye: right">
+      <a-entity id="right-eye-container" class="clickable-balloon" stereo-eye-lock="eye: right">
         <a-sphere id="balloon-right" color="#10b981" material="roughness: 0.15; metalness: 0.2;">
           <a-cone id="cone-right" radius-top="0.01" color="#047857"></a-cone>
         </a-sphere>
       </a-entity>
       
-      <a-entity id="fusion-collision-trigger" class="fusion-target-zone" geometry="primitive: sphere; radius: 0.26" material="visible: false;" stereo-eye-lock="eye: both"></a-entity>
     </a-entity>
 
     <a-entity id="particle-group"></a-entity>
@@ -165,147 +141,80 @@
       }
     }
 
-    let audioCtx = null; let score = 0; let separationDistance = 1.20; 
+    let audioCtx = null; let score = 0; let randomRange = 1.50; 
     let rotationSpeed = 2; let bgAngle = 0; let isTrainingActive = false; let isPopping = false; 
 
     let elapsedInterval = null; let totalSecondsElapsed = 0; let targetSeconds = 600;      
-    let boardX = 0, boardY = 1.6;
     
-    let currentDirection = "horizontal"; 
-    let systemControlMode = "auto"; 
-    let eyeRelationMode = "crossed"; // "crossed"(교차성) 또는 "uncrossed"(동측성)
-    let toggleState = true; 
+    // 현재 터뜨려야 할 활성 타겟 순서 ("left" = 빨강풍선, "right" = 초록풍선)
+    let activeTurn = "left"; 
+    let currentX = 0, currentY = 1.6;
 
-    function getFixedZ() { return -3.5; }
+    function getFixedZ() { return -3.0; } // 무작위 도약을 위한 깊이
 
-    document.getElementById('separation-slider').addEventListener('input', (e) => {
-      separationDistance = parseFloat(e.target.value);
-      document.getElementById('separation-txt').innerText = separationDistance.toFixed(2);
-      if(isTrainingActive) { renderMagicEyeElements(); }
+    document.getElementById('range-slider').addEventListener('input', (e) => {
+      randomRange = parseFloat(e.target.value);
+      document.getElementById('range-txt').innerText = randomRange.toFixed(2);
+      if(isTrainingActive) { renderAlternatingTargets(); }
     });
     document.getElementById('bg-speed-slider').addEventListener('input', (e) => {
       rotationSpeed = parseInt(e.target.value);
       document.getElementById('bg-speed-txt').innerText = rotationSpeed;
     });
 
-    function toggleControlMode(mode) {
-      systemControlMode = mode;
-      const mGroup = document.getElementById('manual-direction-group');
-      if(mode === "manual") {
-        mGroup.style.display = "block";
-        currentDirection = document.getElementById('manual-dir-select').value;
-      } else {
-        mGroup.style.display = "none";
-      }
-      updateDirectionUI();
-    }
-
-    // [신규 로직 인터페이스] 동측성/교차성 변경 스위치 함수
-    function toggleEyeRelationMode(mode) {
-      eyeRelationMode = mode;
-      const relTxt = document.getElementById('current-relation-txt');
-      if(mode === "crossed") {
-        relTxt.innerText = "교차성 (L-우 / R-좌)";
-      } else {
-        relTxt.innerText = "동측성 (L-좌 / R-우)";
-      }
-      if(isTrainingActive) renderMagicEyeElements();
-    }
-
-    function changeDirectionManually(val) {
-      if(systemControlMode === "manual") {
-        currentDirection = val;
-        updateDirectionUI();
-        if(isTrainingActive) renderMagicEyeElements();
-      }
-    }
-
-    function updateDirectionUI() {
-      let text = "좌우 끝";
-      if(currentDirection === "vertical") text = "상하 끝";
-      if(currentDirection === "diagonal-1") text = "사선 (좌상↔우하)";
-      if(currentDirection === "diagonal-2") text = "사선 (좌하↔우상)";
-      document.getElementById('current-dir-txt').innerText = text;
-    }
-
-    // [핵심 업그레이드] 동측성/교차성 물리 연산 분기 적용
-    function renderMagicEyeElements() {
+    // [전면 개조 핵심] 단안 무작위 위치 생성 및 교대 시각화 제어 함수
+    function renderAlternatingTargets() {
       if (!isTrainingActive) return;
 
       let targetZ = getFixedZ(); 
       let radiusRadius = 0.24; 
-      let amp = separationDistance; 
 
-      let leftX = 0, leftY = 1.6;
-      let rightX = 0, rightY = 1.6;
+      // VR 헤드셋의 적정 시야범위 내 완전 랜덤 위치 산출 (X축, Y축 중심값 기준 분산)
+      // 원장님이 설정하시는 슬라이더(randomRange)에 따라 도약 범위 확장 가능
+      let randX = (Math.random() - 0.5) * (randomRange * 2);
+      let randY = 1.6 + (Math.random() - 0.5) * (randomRange * 1.5); 
 
-      // 1. 기본 방향 위치 구조 계산
-      if (currentDirection === "horizontal") {
-        leftX = amp; leftY = 1.6 + (Math.random() - 0.5) * 0.2;  
-        rightX = -amp; rightY = 1.6 + (Math.random() - 0.5) * 0.2; 
-        if(!toggleState) {
-          leftX = amp * 0.6; rightX = -amp * 0.6;
-        }
-      } 
-      else if (currentDirection === "vertical") {
-        leftX = amp * 0.5; leftY = 1.6 + amp * 0.7; 
-        rightX = -amp * 0.5; rightY = 1.6 - amp * 0.7; 
-        if(!toggleState) {
-          leftY = 1.6 - amp * 0.7; rightY = 1.6 + amp * 0.7;
-        }
-      } 
-      else if (currentDirection === "diagonal-1") {
-        if(toggleState) {
-          leftX = amp; leftY = 1.6 - amp * 0.6;   
-          rightX = -amp; rightY = 1.6 + amp * 0.6; 
-        } else {
-          leftX = amp * 0.5; leftY = 1.6 + amp * 0.3;
-          rightX = -amp * 0.5; rightY = 1.6 - amp * 0.3;
-        }
-      } 
-      else if (currentDirection === "diagonal-2") {
-        if(toggleState) {
-          leftX = amp; leftY = 1.6 + amp * 0.6;   
-          rightX = -amp; rightY = 1.6 - amp * 0.6; 
-        } else {
-          leftX = amp * 0.5; leftY = 1.6 - amp * 0.3;
-          rightX = -amp * 0.5; rightY = 1.6 + amp * 0.3;
-        }
-      }
+      // 안전 시야 한계선 보정 (Y축이 바닥 밑으로 가거나 너무 높이 뜨는 것 방지)
+      if (randY < 0.6) randY = 0.6;
+      if (randY > 2.8) randY = 2.8;
 
-      // 2. [동측성 대반전 핵심 연산] 동측성 모드일 경우 좌우 자극 위치를 물리적으로 뒤바꿈
-      if (eyeRelationMode === "uncrossed") {
-        let tempX = leftX;
-        leftX = rightX; // 왼쪽 눈 타겟이 좌측 시야 영역으로 이동
-        rightX = tempX; // 오른쪽 눈 타겟이 우측 시야 영역으로 이동
-      }
+      currentX = randX;
+      currentY = randY;
 
+      const cLeft = document.getElementById('left-eye-container');
+      const cRight = document.getElementById('right-eye-container');
+      
       const bLeft = document.getElementById('balloon-left');
       const bRight = document.getElementById('balloon-right');
-      const cLeft = document.getElementById('cone-left');
-      const cRight = document.getElementById('cone-right');
-      const triggerZone = document.getElementById('fusion-collision-trigger');
+      const coneLeft = document.getElementById('cone-left');
+      const coneRight = document.getElementById('cone-right');
 
-      bLeft.setAttribute('position', `${leftX} ${leftY} ${targetZ}`);
-      bLeft.setAttribute('radius', radiusRadius);
-      cLeft.setAttribute('position', `0 ${-radiusRadius * 1.1} 0`);
-      cLeft.setAttribute('radius-bottom', `${radiusRadius * 0.15}`);
-      cLeft.setAttribute('height', `${radiusRadius * 0.25}`);
+      // 턴에 따라 한쪽 풍선만 활성화하고 반대쪽은 보이지 않게 처리하며 좌표 이동
+      if (activeTurn === "left") {
+        document.getElementById('active-eye-txt').innerText = "왼쪽눈 (빨강)";
+        document.getElementById('active-eye-txt').style.color = "#ff2a2a";
 
-      bRight.setAttribute('position', `${rightX} ${rightY} ${targetZ}`);
-      bRight.setAttribute('radius', radiusRadius);
-      cRight.setAttribute('position', `0 ${-radiusRadius * 1.1} 0`);
-      cRight.setAttribute('radius-bottom', `${radiusRadius * 0.15}`);
-      cRight.setAttribute('height', `${radiusRadius * 0.25}`);
+        cLeft.setAttribute('visible', 'true');
+        cRight.setAttribute('visible', 'false');
 
-      let centerX = (leftX + rightX) / 2;
-      let centerY = (leftY + rightY) / 2;
+        bLeft.setAttribute('position', `${randX} ${randY} ${targetZ}`);
+        bLeft.setAttribute('radius', radiusRadius);
+        coneLeft.setAttribute('position', `0 ${-radiusRadius * 1.1} 0`);
+        coneLeft.setAttribute('radius-bottom', `${radiusRadius * 0.15}`);
+        coneLeft.setAttribute('height', `${radiusRadius * 0.25}`);
+      } 
+      else {
+        document.getElementById('active-eye-txt').innerText = "오른쪽눈 (초록)";
+        document.getElementById('active-eye-txt').style.color = "#10b981";
 
-      if (triggerZone) {
-        triggerZone.setAttribute('position', `${centerX} ${centerY} ${targetZ}`);
-        if(!isPopping && !triggerZone.classList.contains('fusion-target-zone')) {
-          triggerZone.classList.add('fusion-target-zone');
-        }
+        cLeft.setAttribute('visible', 'false');
+        cRight.setAttribute('visible', 'true');
+
+        bRight.setAttribute('position', `${randX} ${randY} ${targetZ}`);
+        bRight.setAttribute('radius', radiusRadius);
+        coneRight.setAttribute('position', `0 ${-radiusRadius * 1.1} 0`);
+        coneRight.setAttribute('radius-bottom', `${radiusRadius * 0.15}`);
+        coneRight.setAttribute('height', `${radiusRadius * 0.25}`);
       }
     }
 
@@ -320,8 +229,9 @@
       });
     }
 
-    function checkMagicEyeFixation() {
-      requestAnimationFrame(checkMagicEyeFixation);
+    // 레이캐스터(컨트롤러/포인터 조준) 충돌 체크 로직
+    function checkTargetFixation() {
+      requestAnimationFrame(checkTargetFixation);
       if (!isTrainingActive || isPopping) return; 
 
       const raycasterEl = document.getElementById('centerFixationRay');
@@ -329,30 +239,40 @@
 
       let raycasterComponent = raycasterEl.components.raycaster;
       if (raycasterComponent && raycasterComponent.intersections && raycasterComponent.intersections.length > 0) {
-        const triggerZone = document.getElementById('fusion-collision-trigger');
-        if (triggerZone) { triggerZone.classList.remove('fusion-target-zone'); }
-        isPopping = true; 
-        popMagicEyeSuccess();
+        
+        // 현재 활성화된 눈 레이어의 풍선을 짚었는지 정밀 대조 확인
+        let intersectedEl = raycasterComponent.intersections[0].el;
+        let intersectedId = intersectedEl.getAttribute('id');
+        
+        if ((activeTurn === "left" && (intersectedId === "left-eye-container" || intersectedId === "balloon-left")) ||
+            (activeTurn === "right" && (intersectedId === "right-eye-container" || intersectedId === "balloon-right"))) {
+          
+          isPopping = true; 
+          popTargetSuccess();
+        }
       }
     }
 
-    function popMagicEyeSuccess() {
-      const board = document.getElementById('magic-eye-board');
+    function popTargetSuccess() {
       playPopSound(); 
       score += 1000;
       document.getElementById('val-score').innerText = score.toString().padStart(4, '0');
 
-      triggerParticlesEmission((boardX), 1.6, getFixedZ(), 25);
-      board.setAttribute('visible', 'false');
+      // 파티클 방출 효과 연동
+      triggerParticlesEmission(currentX, currentY, getFixedZ(), 20);
       
-      toggleState = !toggleState;
+      // 양안 교대 스위칭 연산
+      activeTurn = (activeTurn === "left") ? "right" : "left";
+
+      // 숨겼다가 다음 랜덤 위치에 재배치하는 0.4초 인터벌 딜레이 적용
+      document.getElementById('magic-eye-board').setAttribute('visible', 'false');
 
       setTimeout(() => {
         if (!isTrainingActive) return;
         isPopping = false;
-        renderMagicEyeElements(); 
-        board.setAttribute('visible', 'true'); 
-      }, 600); 
+        renderAlternatingTargets(); 
+        document.getElementById('magic-eye-board').setAttribute('visible', 'true'); 
+      }, 400); 
     }
 
     function animateBackground() {
@@ -376,18 +296,6 @@
         let min = Math.floor(totalSecondsElapsed / 60); let sec = totalSecondsElapsed % 60;
         document.getElementById('val-time').innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
         
-        if (systemControlMode === "auto") {
-          if (totalSecondsElapsed === 120) {
-            currentDirection = "vertical"; updateDirectionUI(); renderMagicEyeElements();
-          } else if (totalSecondsElapsed === 240) {
-            currentDirection = "diagonal-1"; updateDirectionUI(); renderMagicEyeElements();
-          } else if (totalSecondsElapsed === 360) {
-            currentDirection = "diagonal-2"; updateDirectionUI(); renderMagicEyeElements();
-          } else if (totalSecondsElapsed === 480) {
-            currentDirection = "horizontal"; updateDirectionUI(); renderMagicEyeElements();
-          }
-        }
-
         if (totalSecondsElapsed >= targetSeconds) { 
           clearInterval(elapsedInterval); 
           playFanfareAndFinish(); 
@@ -471,13 +379,9 @@
       document.getElementById('control-panel').style.display = 'none';
       document.getElementById('exit-vr-control').style.display = 'block';
       
-      boardX = 0; boardY = 1.6;
-      toggleState = true;
-      if(systemControlMode === "auto") { currentDirection = "horizontal"; }
-      updateDirectionUI();
-      
+      activeTurn = "left"; 
       document.getElementById('magic-eye-board').setAttribute('visible', 'true');
-      renderMagicEyeElements(); 
+      renderAlternatingTargets(); 
       startElapsedClock();
       
       const sceneEl = document.querySelector('a-scene');
@@ -486,7 +390,7 @@
 
     setupVRHardwareLayers();
     animateBackground();
-    requestAnimationFrame(checkMagicEyeFixation);
+    requestAnimationFrame(checkTargetFixation);
   </script>
 </body>
 </html>
